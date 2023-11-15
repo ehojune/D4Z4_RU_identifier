@@ -145,13 +145,6 @@ def run_porechop():
     pass
 
 
-
-
-
-
-
-
-
 if __name__ == "__main__":
 
     #Read args
@@ -170,7 +163,7 @@ if __name__ == "__main__":
 
     #Read config
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    config.read(config_path)
     sample_fastq_dict = config['Sample FASTQ Path']
     D4Z4_ref = config['Reference Sequences Path']['D4Z4_ref']
     probe_ref = config['Reference Sequences Path']['probe_ref']
@@ -179,7 +172,7 @@ if __name__ == "__main__":
     XapI = config['Enzyme Sequences']['XapI']
     pLAM_4qA_seq = config['Plam Feature Sequences']['pLAM_4qA_seq']
     pLAM_10q_seq = config['Plam Feature Sequences']['pLAM_10q_seq']
-    blastn_path = config['External Programs']['blastn']
+    blastn_path = config['External Programs']['blastn_path']
     makeblastdb_path = config['External Programs']['makeblastdb_path']
     porechop_path = config['External Programs']['porechop_path']
 
@@ -233,27 +226,28 @@ if __name__ == "__main__":
         run_blastn(sample_blastdb_path, pLAM_ref, output_sample_blastn_pLAM_path)
         run_blastn(sample_blastdb_path, D4Z4_ref, output_sample_blastn_D4Z4_path)
         run_blastn(sample_blastdb_path, probe_ref, output_sample_blastn_probe_path)
-        pLAM_blastresult = browse_blastresult(output_sample_blastn_pLAM_path)
-        D4Z4_blastresult = browse_blastresult(output_sample_blastn_D4Z4_path)
-        probe_blastresult =  browse_blastresult(output_sample_blastn_probe_path)
-        pLAM_probe_overlap_seqID = check_overlap_seqid_in_blastresults(pLAM_blastresult, probe_blastresult)
+        # browse and find overlapping readIDs in blastn results
+        pLAM_probe_overlap_seqID = check_overlap_seqid_in_blastresults(output_sample_blastn_pLAM_path, output_sample_blastn_probe_path)
         if not pLAM_probe_overlap_seqID:
             print(f"sample {sample} does not have pLAM & probe overlapping seq.")
             continue
         matched_readID[sample] = pLAM_probe_overlap_seqID
         sample_blastn_dict[sample] = output_sample_blastn_path
 
-    # Turminate pipeline if no sample has pLAM & probe overlapping seq.
+
+    # Terminate pipeline if no sample has pLAM & probe overlapping seq.
     if not matched_readID:
         sys.exit("No sample has pLAM & probe overlapping seq. Terminated.")
+
 
     # collect, filter, sort and write blast results of matched seqID
     collected_blastn_result_per_readID = {}
 
     for sample in sample_blastn_dict.keys():
-        # get matched readID for sample & browse sample's blastn file paths
-        sample_blastn_path = sample_blastn_dict[sample]
+        # get matched readID for sample
         sample_readID_list = matched_readID[sample]
+        # browse sample's blastn file paths
+        sample_blastn_path = sample_blastn_dict[sample]
         sample_pLAM_blastresult = browse_blastresult(f"{sample_blastn_path}/pLAM_{sample}.txt")
         sample_D4Z4_blastresult = browse_blastresult(f"{sample_blastn_path}/D4Z4_{sample}.txt")
         sample_probe_blastresult = browse_blastresult(f"{sample_blastn_path}/probe_{sample}.txt")

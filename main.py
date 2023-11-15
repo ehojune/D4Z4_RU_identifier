@@ -36,7 +36,7 @@ def convert_fq2fa(sample_fastq_path, output_fasta_path):
 
 def run_makeblastdb(makeblastdb_path, fasta_path, output_db_path):
     command = makeblastdb_path
-    command += " -in fasta_path -input_type nucl"
+    command += f" -in {fasta_path} -dbtype nucl"
     command += f" -out {output_db_path}"
     os.system(command)
 
@@ -258,5 +258,5 @@ if __name__ == "__main__":
             filtered_blastresult = filter_blastresultlist_with_alignment_cov(extracted_blastresult_with_readID, 0.9)
             filtered_blastresult = filter_blastresultlist_with_pid(filtered_blastresult, 0.8)
             filtered_blastresult = sort_blastresult_list(filtered_blastresult, 'sstart', False)
-            write_blastresult_tsv(f"{sample_blastn_path}/{readID}.blastn.tsv", filtered_blastresult)
+            write_blastresult_tsv(filtered_blastresult, f"{sample_blastn_path}/{readID}.blastn.tsv")
 

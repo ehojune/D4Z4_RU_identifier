@@ -108,6 +108,8 @@ def check_overlap_seqid_in_blastresults(blast_filename1, blast_filename2):
 
 def write_blastresult_tsv(blastresult_list, save_path):
     fw = open(save_path, 'w')
+    fw.write("qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\t\
+        sstart\tsend\tevalue\tbitscore\tqlen\tslen")
     for blastresult in blastresult_list:
         fw.write(f"{blastresult.qseqid}\t{blastresult.sseqid}\t\
             {blastresult.pident}\t{blastresult.length}\t{blastresult.mismatch}\t\
@@ -120,6 +122,123 @@ def sort_blastresult_list(blastresult_list :list, sortby: str, reverse: bool) ->
     #order: if False, becomes reverse.
     #need to have """ from operator import attrgetter """
     return sorted(blastresult_list, key = attrgetter(sortby), reverse = reverse)
+
+
+
+
+
+
+
+
+
+
+
+
+
+class SeqObject:
+    def __init__(self, name, seq):
+        self.name = name
+        self.seq = seq
+
+
+
+
+### funcs ###
+
+
+
+def extract_read_from_fasta_with_readID(readID, fasta_path, output_path):
+    with open(fasta_path, 'r') as fasta, open(output_path, 'w') as fw:
+        while True:
+            line = fasta.readline()
+            if len(line) < 2:
+                return 0
+            if line.startswith(f">{readID}"):
+                fw.write(line)
+                fw.write(line)
+                print(f"write {output_path}.")
+                return 0
+            else:
+                fasta.readline()
+
+
+
+
+
+def extract_tr_positions_from_blastresult_tsv(read_blast_result):
+    tr_positions = []
+    with open(read_blast_result, 'r') as fr:
+        for line in fr:
+            tr_pos = (int(line.split()[8])-1, int(line.split()[9])-1)
+            if len(line)>2: tr_positions.append(tr_pos)
+            else: break
+    return tr_positions
+
+def extract_seq_from_read_fasta(raw_read_fa):
+    with open(raw_read_fa, 'r') as fr:
+        fr.readline()
+        seq = fr.readline().strip()
+    return seq
+
+def revcomp(seq):
+    comp_map = {"A": "T", "G": "C", "C": "G", "T": "A"}
+    revcomp_seq = ''
+    seq = seq[::-1].upper()
+    for base in seq:
+        revcomp_seq += comp_map[base]
+    return revcomp_seq
+
+def extract_tr_from_read(readID, read_fasta_path, tr_read_blast_path, output_path):
+    tr_positions = extract_tr_positions_from_blastresult_tsv(tr_read_blast_path)
+    seq = extract_seq_from_read_fasta(read_fasta_path)
+    tr_list = []
+
+    #If my read is reverse (we can know it by comparing blast's s.start, s.end info)
+    if tr_positions[0][0] > tr_positions[0][1]:
+        for tr_idx in range(len(tr_positions)):
+            tr_pos = tr_positions[tr_idx]
+            adj_tr_pos = (tr_pos[1], tr_pos[0]+1)
+            tr = revcomp(seq[adj_tr_pos[0]:adj_tr_pos[1]])
+            tr_list.append(tr)
+        tr_list.reverse()
+
+    #If my read is not-reverse
+    else:
+        for tr_idx in range(len(tr_positions)):
+            tr_pos = tr_positions[tr_idx]
+            adj_tr_pos = (tr_pos[0], tr_pos[1]+1)
+            tr = seq[adj_tr_pos[0]:adj_tr_pos[1]]
+            tr_list.append(tr)
+
+    # write tr units in a file
+    with open(output_path, 'w') as fw:
+        for tr_idx, tr_seq in enumerate(tr_list):
+            fw.write(f">{readID}_repeat{tr_idx+1}\n{tr_seq}\n")
+
+
+
+
+def add_reference_to_tr_extracted_fasta(ref_trf_fa, trf_seperated_fa):
+    subprocess.run([f"cat {ref_trf_fa} {trf_seperated_fa} > {trf_seperated_fa}.with.reference_trf.fasta"], shell=True, check=True)
+
+if __name__ == "__main__":
+    for i in range(len(Read_list)):
+        extract_tr_from_read(i, Read_list[i], BLAST_list[i], output_dir)
+        add_reference_to_tr_extracted_fasta(trf_reference, f"{output_dir}Read{i+1}_trf_seperated.fa")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -217,7 +336,7 @@ if __name__ == "__main__":
     for sample in sample_blastdb_dict.keys():
         # get input file path, set output file path
         sample_blastdb_path = sample_blastdb_dict[sample]
-        output_sample_blastn_path = f"{outdir_blastdb_path}/{sample}"
+        output_sample_blastn_path = f"{outdir_blastn_path}/{sample}"
         os.makedirs(output_sample_blastn_path, exist_ok=True)
         output_sample_blastn_pLAM_path = f"{output_sample_blastn_path}/pLAM_{sample}.txt"
         output_sample_blastn_D4Z4_path = f"{output_sample_blastn_path}/D4Z4_{sample}.txt"
@@ -241,6 +360,7 @@ if __name__ == "__main__":
 
 
     # collect, filter, sort and write blast results of matched seqID
+    # make an output of blast result of a matched read that contains pLAM, D4Z4 and probe.
     collected_blastn_result_per_readID = {}
 
     for sample in sample_blastn_dict.keys():
@@ -254,9 +374,45 @@ if __name__ == "__main__":
         sample_blastresult = sample_pLAM_blastresult + sample_D4Z4_blastresult + sample_probe_blastresult
         # filter, sort and write blastn result for each readID
         for readID in sample_readID_list:
+            os.makedirs(f"{sample_blastn_path}/{readID}", exist_ok=True)
+
             extracted_blastresult_with_readID = filter_blastresult_with_seqid(sample_blastresult, readID)
-            filtered_blastresult = filter_blastresultlist_with_alignment_cov(extracted_blastresult_with_readID, 0.9)
+            filtered_blastresult = filter_blastresultlist_with_alignment_cov(extracted_blastresult_with_readID, 0.7)
             filtered_blastresult = filter_blastresultlist_with_pid(filtered_blastresult, 0.8)
             filtered_blastresult = sort_blastresult_list(filtered_blastresult, 'sstart', False)
-            write_blastresult_tsv(filtered_blastresult, f"{sample_blastn_path}/{readID}.blastn.tsv")
+            write_blastresult_tsv(filtered_blastresult, f"{sample_blastn_path}/{readID}/{readID}.blastn.tsv")
+
+            extracted_D4Z4_blastresult_with_readID = filter_blastresult_with_seqid(sample_D4Z4_blastresult, readID)
+            filtered_D4Z4_blastresult = filter_blastresultlist_with_alignment_cov(extracted_D4Z4_blastresult_with_readID, 0.7)
+            filtered_D4Z4_blastresult = filter_blastresultlist_with_pid(filtered_D4Z4_blastresult, 0.8)
+            filtered_D4Z4_blastresult = sort_blastresult_list(filtered_D4Z4_blastresult, 'sstart', False)
+            write_blastresult_tsv(filtered_D4Z4_blastresult, f"{sample_blastn_path}/{readID}/{readID}.D4Z4.blastn.tsv")
+
+            collected_blastn_result_per_readID[readID] = f"{sample_blastn_path}/{readID}"
+
+
+    # extract matched reads from FASTQ
+    matched_reads_fasta_path = {}
+    os.makedirs(f"{output_path}/matched_reads" , exist_ok=True)
+    for sample in sample_blastn_dict.keys():
+        sample_readID_list = matched_readID[sample]
+        os.makedirs(f"{output_path}/matched_reads/{sample}", exist_ok=True)
+        for readID in sample_readID_list:
+            output_read_fasta_dir = f"{output_path}/matched_reads/{sample}/{readID}"
+            os.makedirs(output_read_fasta_dir, exist_ok=True)
+            output_read_fasta_path = f"{output_read_fasta_dir}/{readID}.fasta"
+            sample_fasta_path = sample_fasta_dict[sample]
+            extract_read_from_fasta_with_readID(readID, sample_fasta_path, output_read_fasta_path)
+            matched_reads_fasta_path[readID] = output_read_fasta_path
+
+
+    # extract D4Z4 from each matched reads FASTQ
+    for sample in sample_blastn_dict.keys():
+        sample_readID_list = matched_readID[sample]
+        for readID in sample_readID_list:
+            read_fasta_path = matched_reads_fasta_path[readID]
+            read_D4Z4_blast_path = collected_blastn_result_per_readID[readID] + f"/{readID}.D4Z4.blastn.tsv"
+            output_D4Z4_seperated_fasta_path = collected_blastn_result_per_readID[readID] +f"/{readID}.D4Z4.fasta"
+            extract_tr_from_read(readID, read_fasta_path, read_D4Z4_blast_path, output_D4Z4_seperated_fasta_path)
+            add_reference_to_tr_extracted_fasta(D4Z4_ref, output_D4Z4_seperated_fasta_path+f"/reference_added.fasta")
 

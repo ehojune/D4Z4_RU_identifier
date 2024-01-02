@@ -22,15 +22,19 @@ class BlastResult:
         self.qlen = qlen
         self.slen = slen
 
+
+### funcs ###
+
 # gunzip function is not used; but let users make sure their input fastq to be unzipped in the manual.
 def run_gunzip(gzipped_file_path, output_path):
     command = f"gunzip -c {gzipped_file_path} >{output_path}"
     os.system(command)
 
 def convert_fq2fa(sample_fastq_path, output_fasta_path):
-        command = f"cat {sample_fastq_path} "
-        command += "awk \'\{if(NR%4==1) {printf(\">%s\\n\",substr($0,2));\} else if(NR%4==2) print;}\' > "
+        command = f"cat {sample_fastq_path} |"
+        command += "awk \'{if(NR%4==1) {printf(\">%s\\n\",substr($0,2));} else if(NR%4==2) print;}\' > "
         command += output_fasta_path
+        print(command)
         os.system(command)
         print(f"fq file {sample_fastq_path} converted to fa file in {output_fasta_path}")
 
@@ -65,7 +69,7 @@ def browse_blastresult(blast_filename):
                 sstart = int(line_splited[8])
                 send = int(line_splited[9])
                 evalue = line_splited[10]
-                bitscore = int(line_splited[11])
+                bitscore = float(line_splited[11])
                 qlen = int(line_splited[12])
                 slen = int(line_splited[13])
                 blastresults.append(BlastResult(qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qlen, slen))
@@ -126,27 +130,6 @@ def sort_blastresult_list(blastresult_list :list, sortby: str, reverse: bool) ->
 
 
 
-
-
-
-
-
-
-
-
-
-class SeqObject:
-    def __init__(self, name, seq):
-        self.name = name
-        self.seq = seq
-
-
-
-
-### funcs ###
-
-
-
 def extract_read_from_fasta_with_readID(readID, fasta_path, output_path):
     with open(fasta_path, 'r') as fasta, open(output_path, 'w') as fw:
         while True:
@@ -155,20 +138,18 @@ def extract_read_from_fasta_with_readID(readID, fasta_path, output_path):
                 return 0
             if line.startswith(f">{readID}"):
                 fw.write(line)
+                line = fasta.readline()
                 fw.write(line)
                 print(f"write {output_path}.")
                 return 0
             else:
                 fasta.readline()
 
-
-
-
-
 def extract_tr_positions_from_blastresult_tsv(read_blast_result):
     tr_positions = []
     with open(read_blast_result, 'r') as fr:
         for line in fr:
+            if line.startswith("qseqid"): continue #header line
             tr_pos = (int(line.split()[8])-1, int(line.split()[9])-1)
             if len(line)>2: tr_positions.append(tr_pos)
             else: break
@@ -217,35 +198,9 @@ def extract_tr_from_read(readID, read_fasta_path, tr_read_blast_path, output_pat
 
 
 
+def add_reference_to_tr_extracted_fasta(ref_tr_fa, tr_seperated_fa):
+    os.system(f"cat {ref_tr_fa} {tr_seperated_fa} > {tr_seperated_fa}.with.reference_trf.fasta")
 
-def add_reference_to_tr_extracted_fasta(ref_trf_fa, trf_seperated_fa):
-    subprocess.run([f"cat {ref_trf_fa} {trf_seperated_fa} > {trf_seperated_fa}.with.reference_trf.fasta"], shell=True, check=True)
-
-if __name__ == "__main__":
-    for i in range(len(Read_list)):
-        extract_tr_from_read(i, Read_list[i], BLAST_list[i], output_dir)
-        add_reference_to_tr_extracted_fasta(trf_reference, f"{output_dir}Read{i+1}_trf_seperated.fa")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def print_without_overlap(print_list):
-    print_list = list(set(print_list))
-    for i in print_list:
-        print(i)
 
 """
 if __name__ == "__main__":
@@ -392,6 +347,10 @@ if __name__ == "__main__":
 
 
     # extract matched reads from FASTQ
+    print(collected_blastn_result_per_readID)
+    print("start extracting matched reads from FASTQ")
+
+
     matched_reads_fasta_path = {}
     os.makedirs(f"{output_path}/matched_reads" , exist_ok=True)
     for sample in sample_blastn_dict.keys():
@@ -405,7 +364,7 @@ if __name__ == "__main__":
             extract_read_from_fasta_with_readID(readID, sample_fasta_path, output_read_fasta_path)
             matched_reads_fasta_path[readID] = output_read_fasta_path
 
-
+    print("extract D4Z4 from each matched reads FASTQ")
     # extract D4Z4 from each matched reads FASTQ
     for sample in sample_blastn_dict.keys():
         sample_readID_list = matched_readID[sample]
@@ -414,5 +373,4 @@ if __name__ == "__main__":
             read_D4Z4_blast_path = collected_blastn_result_per_readID[readID] + f"/{readID}.D4Z4.blastn.tsv"
             output_D4Z4_seperated_fasta_path = collected_blastn_result_per_readID[readID] +f"/{readID}.D4Z4.fasta"
             extract_tr_from_read(readID, read_fasta_path, read_D4Z4_blast_path, output_D4Z4_seperated_fasta_path)
-            add_reference_to_tr_extracted_fasta(D4Z4_ref, output_D4Z4_seperated_fasta_path+f"/reference_added.fasta")
-
+            add_reference_to_tr_extracted_fasta(D4Z4_ref, output_D4Z4_seperated_fasta_path)

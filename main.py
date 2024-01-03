@@ -56,7 +56,7 @@ def browse_blastresult(blast_filename):
     blastresults = []
     with open(blast_filename, 'r') as fr:
         for line in fr:
-            if not line.startswith('#'):
+            if not line.startswith('#') and not line.startswith('qseqid'):
                 line_splited = line.strip().split('\t')
                 qseqid = line_splited[0]
                 sseqid = line_splited[1]
@@ -113,7 +113,7 @@ def check_overlap_seqid_in_blastresults(blast_filename1, blast_filename2):
 def write_blastresult_tsv(blastresult_list, save_path):
     fw = open(save_path, 'w')
     fw.write("qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\t\
-        sstart\tsend\tevalue\tbitscore\tqlen\tslen")
+        sstart\tsend\tevalue\tbitscore\tqlen\tslen\n")
     for blastresult in blastresult_list:
         fw.write(f"{blastresult.qseqid}\t{blastresult.sseqid}\t\
             {blastresult.pident}\t{blastresult.length}\t{blastresult.mismatch}\t\
@@ -126,8 +126,6 @@ def sort_blastresult_list(blastresult_list :list, sortby: str, reverse: bool) ->
     #order: if False, becomes reverse.
     #need to have """ from operator import attrgetter """
     return sorted(blastresult_list, key = attrgetter(sortby), reverse = reverse)
-
-
 
 
 def extract_read_from_fasta_with_readID(readID, fasta_path, output_path):
@@ -199,21 +197,31 @@ def extract_tr_from_read(readID, read_fasta_path, tr_read_blast_path, output_pat
 
 
 def add_reference_to_tr_extracted_fasta(ref_tr_fa, tr_seperated_fa):
-    os.system(f"cat {ref_tr_fa} {tr_seperated_fa} > {tr_seperated_fa}.with.reference_trf.fasta")
+    os.system(f"cat {ref_tr_fa} {tr_seperated_fa} > {tr_seperated_fa}.with.reference_tr.fasta")
 
 
-"""
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='search a read ID that exists in both blast result file of [query:plam, db:sample_reads] and [query:probe, db:sample_reads]')
-    parser.add_argument('--output', required=True, help='full path of output directory')
-    args = parser.parse_args()
+def make_query_fasta(query_name, query_target_seq, output_path):
+    with open(f"{output_path}/{query_name}.fasta", 'w') as fw:
+        fw.write(f">{query_name}\n")
+        fw.write(f"{query_target_seq}\n")
 
-    output_path = args.output
-    _path_blastresult_plam = args.plam
 
-    matched_ids = find_matched_id(_path_blastresult_probe, _path_blastresult_plam)
-    print_without_overlap(matched_ids)
-"""
+def run_blastn_short(makeblastdb_path, query_path, output_path, word_size):
+    # run with default output format
+    command = blastn_path
+    command += f" -task blastn-short -query {query_path} -db {makeblastdb_path} "
+    if word_size:
+        command += f" -word_size {word_size} "
+    command += f" -out {output_path} "
+    os.system(command)
+
+    # run again with output format 6
+    command = command.split("-out")[0]
+    command += f" -out {output_path}.outfmt6.tsv "
+    command += " -outfmt \"6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen\" "
+    os.system(command)
+
+
 
 def run_porechop():
     pass
@@ -242,8 +250,8 @@ if __name__ == "__main__":
     D4Z4_ref = config['Reference Sequences Path']['D4Z4_ref']
     probe_ref = config['Reference Sequences Path']['probe_ref']
     pLAM_ref = config['Reference Sequences Path']['pLAM_ref']
-    BlnI = config['Enzyme Sequences']['BlnI']
-    XapI = config['Enzyme Sequences']['XapI']
+    BlnI_seq = config['Enzyme Sequences']['BlnI_seq']
+    XapI_seq = config['Enzyme Sequences']['XapI_seq']
     pLAM_4qA_seq = config['Plam Feature Sequences']['pLAM_4qA_seq']
     pLAM_10q_seq = config['Plam Feature Sequences']['pLAM_10q_seq']
     blastn_path = config['External Programs']['blastn_path']
@@ -251,11 +259,17 @@ if __name__ == "__main__":
     porechop_path = config['External Programs']['porechop_path']
 
 
-    #Convert FASTQ to FASTA
+    #Make BlnI, XapI and pLAM specific sequences to fasta files
     outdir_fasta_path = output_path + '/fasta'
     os.makedirs(outdir_fasta_path, exist_ok=True)
-    sample_fasta_dict = {}
+    make_query_fasta("BlnI_seq", BlnI_seq, outdir_fasta_path)
+    make_query_fasta("XapI_seq", XapI_seq, outdir_fasta_path)
+    make_query_fasta("pLAM_4qA_seq", pLAM_4qA_seq, outdir_fasta_path)
+    make_query_fasta("pLAM_10q_seq", pLAM_10q_seq, outdir_fasta_path)
 
+
+    #Convert FASTQ to FASTA
+    sample_fasta_dict = {}
     for sample in sample_fastq_dict.keys():
         # get input file path, set output file path
         sample_fastq_path = sample_fastq_dict[sample]
@@ -263,7 +277,6 @@ if __name__ == "__main__":
         sample_fasta_dict[sample] = output_fasta_path
         # run function
         convert_fq2fa(sample_fastq_path, output_fasta_path)
-
 
 
     # make blastdb for FASTA files
@@ -363,14 +376,39 @@ if __name__ == "__main__":
             sample_fasta_path = sample_fasta_dict[sample]
             extract_read_from_fasta_with_readID(readID, sample_fasta_path, output_read_fasta_path)
             matched_reads_fasta_path[readID] = output_read_fasta_path
-
     print("extract D4Z4 from each matched reads FASTQ")
+
     # extract D4Z4 from each matched reads FASTQ
     for sample in sample_blastn_dict.keys():
         sample_readID_list = matched_readID[sample]
         for readID in sample_readID_list:
             read_fasta_path = matched_reads_fasta_path[readID]
-            read_D4Z4_blast_path = collected_blastn_result_per_readID[readID] + f"/{readID}.D4Z4.blastn.tsv"
-            output_D4Z4_seperated_fasta_path = collected_blastn_result_per_readID[readID] +f"/{readID}.D4Z4.fasta"
+            readID_result_path = collected_blastn_result_per_readID[readID]
+            read_D4Z4_blast_path = readID_result_path + f"/{readID}.D4Z4.blastn.tsv"
+            output_D4Z4_seperated_fasta_path = readID_result_path +f"/{readID}.D4Z4.fasta"
             extract_tr_from_read(readID, read_fasta_path, read_D4Z4_blast_path, output_D4Z4_seperated_fasta_path)
             add_reference_to_tr_extracted_fasta(D4Z4_ref, output_D4Z4_seperated_fasta_path)
+
+    # make blastdb for each d4z4 of each read of each sample
+    # run blastn-short for enzyme, plam
+    for sample in sample_blastn_dict.keys():
+        sample_readID_list = matched_readID[sample]
+        for readID in sample_readID_list:
+            read_fasta_path = matched_reads_fasta_path[readID]
+            readID_result_path = collected_blastn_result_per_readID[readID]
+            output_D4Z4_seperated_fasta_path = readID_result_path +f"/{readID}.D4Z4.fasta"
+            D4Z4_blastdb_path = output_D4Z4_seperated_fasta_path.split(".D4Z4")[0]
+            read_blastdb_path = read_fasta_path.split(".fasta")[0]
+
+            run_makeblastdb(makeblastdb_path, output_D4Z4_seperated_fasta_path, D4Z4_blastdb_path)
+            run_makeblastdb(makeblastdb_path, read_fasta_path, read_blastdb_path)
+
+            run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/BlnI_seq.fasta",f"{readID_result_path}/BlnI_seq.blast.tsv", 6)
+            run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/XapI_seq.fasta", f"{readID_result_path}/XapI_seq.blast.tsv", 6)
+            run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_4qA_seq.fasta", f"{readID_result_path}/pLAM_4qA_seq.blast.tsv", 17)
+            run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_10q_seq.fasta", f"{readID_result_path}/pLAM_10q_seq.blast.tsv", 17)
+            
+            os.system(f"rm {D4Z4_blastdb_path}.n*")
+            os.system(f"rm {read_blastdb_path}.n*")
+
+    

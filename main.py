@@ -206,10 +206,10 @@ def make_query_fasta(query_name, query_target_seq, output_path):
         fw.write(f"{query_target_seq}\n")
 
 
-def run_blastn_short(makeblastdb_path, query_path, output_path, word_size):
+def run_blastn_short(makeblastdb_path, query_path, output_path, word_size=False):
     # run with default output format
     command = blastn_path
-    command += f" -task blastn-short -query {query_path} -db {makeblastdb_path} "
+    command += f" -task blastn-short -dust no -evalue 1000 -soft_masking false -query {query_path} -db {makeblastdb_path} "
     if word_size:
         command += f" -word_size {word_size} "
     command += f" -out {output_path} "
@@ -405,8 +405,8 @@ if __name__ == "__main__":
 
             run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/BlnI_seq.fasta",f"{readID_result_path}/BlnI_seq.blast.tsv", 6)
             run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/XapI_seq.fasta", f"{readID_result_path}/XapI_seq.blast.tsv", 6)
-            run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_4qA_seq.fasta", f"{readID_result_path}/pLAM_4qA_seq.blast.tsv", 17)
-            run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_10q_seq.fasta", f"{readID_result_path}/pLAM_10q_seq.blast.tsv", 17)
+            run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_4qA_seq.fasta", f"{readID_result_path}/pLAM_4qA_seq.blast.tsv")
+            run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_10q_seq.fasta", f"{readID_result_path}/pLAM_10q_seq.blast.tsv")
             
             os.system(f"rm {D4Z4_blastdb_path}.n*")
             os.system(f"rm {read_blastdb_path}.n*")

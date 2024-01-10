@@ -3,6 +3,7 @@ import os
 import argparse
 import sys
 from operator import attrgetter
+import matplotlib.pyplot as plt
 
 
 class BlastResult:
@@ -22,6 +23,20 @@ class BlastResult:
         self.qlen = qlen
         self.slen = slen
 
+class D4Z4:
+    def __init__(self, pos, XapI, BlnI):
+        self.pos = pos
+        self.XapI = XapI
+        self.BlnI = BlnI
+
+class MatchedReads:
+    def __init__(self, pos, d4z4, pLAM, probe, pLAM_seq, read_id):
+        self.pos = pos
+        self.d4z4 = d4z4
+        self.pLAM = pLAM
+        self.probe = probe
+        self.pLAM_seq = pLAM_seq
+        self.read_id = read_id
 
 ### funcs ###
 
@@ -127,7 +142,6 @@ def sort_blastresult_list(blastresult_list :list, sortby: str, reverse: bool) ->
     #need to have """ from operator import attrgetter """
     return sorted(blastresult_list, key = attrgetter(sortby), reverse = reverse)
 
-
 def extract_read_from_fasta_with_readID(readID, fasta_path, output_path):
     with open(fasta_path, 'r') as fasta, open(output_path, 'w') as fw:
         while True:
@@ -194,17 +208,13 @@ def extract_tr_from_read(readID, read_fasta_path, tr_read_blast_path, output_pat
         for tr_idx, tr_seq in enumerate(tr_list):
             fw.write(f">{readID}_repeat{tr_idx+1}\n{tr_seq}\n")
 
-
-
 def add_reference_to_tr_extracted_fasta(ref_tr_fa, tr_seperated_fa):
     os.system(f"cat {ref_tr_fa} {tr_seperated_fa} > {tr_seperated_fa}.with.reference_tr.fasta")
-
 
 def make_query_fasta(query_name, query_target_seq, output_path):
     with open(f"{output_path}/{query_name}.fasta", 'w') as fw:
         fw.write(f">{query_name}\n")
         fw.write(f"{query_target_seq}\n")
-
 
 def run_blastn_short(makeblastdb_path, query_path, output_path, word_size=False):
     # run with default output format
@@ -220,6 +230,64 @@ def run_blastn_short(makeblastdb_path, query_path, output_path, word_size=False)
     command += f" -out {output_path}.outfmt6.tsv "
     command += " -outfmt \"6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen\" "
     os.system(command)
+
+def draw_arrows(matched_reads):
+    # 각 숫자에 적절한 간격을 주기 위한 값
+    gap = 700
+
+    # 그림 그리기
+    fig, ax = plt.subplots(figsize=(10, 2))
+
+    # 방향 설정
+    direction = 1 if matched_reads.pos[0] < matched_reads.pos[1] else -1
+
+    # 검은 화살표 그리기 (일반적인 화살표 모양으로 변경)
+    ax.annotate("", xy=(matched_reads.pos[1], 0), xytext=(matched_reads.pos[0], 0),
+                arrowprops=dict(arrowstyle='->', color='black', lw=2))
+    ax.text((matched_reads.pos[0] + matched_reads.pos[1]) / 2, -0.03, matched_reads.read_id, ha='center', va='bottom', color='black', fontsize=8)
+    # 검은 화살표 위에 숫자 표시
+    ax.text(matched_reads.pos[0], 0.01, str(matched_reads.pos[0]), ha='center', va='bottom', color='black', fontsize=6)
+    ax.text(matched_reads.pos[1], 0.01, str(matched_reads.pos[1]), ha='center', va='bottom', color='black', fontsize=6)
+
+    # 빨간 화살표 그리기 (pLAM)
+    index_y = 0.03
+    ax.annotate("", xy=(matched_reads.pLAM[1], index_y), xytext=(matched_reads.pLAM[0], index_y),
+                arrowprops=dict(arrowstyle='->', color='red', lw=2 * direction))
+    ax.text((matched_reads.pLAM[0] + matched_reads.pLAM[1]) / 2, index_y -0.01, 'pLAM', ha='center', va='top', color='red', fontsize=8)
+
+    # 빨간 화살표 그리기 (probe)
+    ax.annotate("", xy=(matched_reads.probe[1], index_y), xytext=(matched_reads.probe[0], index_y),
+                arrowprops=dict(arrowstyle='->', color='red', lw=2 * direction))
+    ax.text((matched_reads.probe[0] + matched_reads.probe[1]) / 2, index_y -0.01, 'probe', ha='center', va='top', color='red', fontsize=8)
+
+    # 빨간 화살표 그리기 (d4z4)
+    for i, d4z4 in enumerate(matched_reads.d4z4):
+        # 특정 위치에 위치된 선 그리기
+        if d4z4.BlnI != 'NA':
+            ax.plot([d4z4.BlnI, d4z4.BlnI], [index_y + 0.01, index_y + 0.03], color='blue', lw=2 * direction)
+            ax.text(d4z4.BlnI, index_y + 0.03, 'BlnI', ha='center', va='bottom', color='blue', fontsize=6)
+
+        if d4z4.XapI != 'NA':
+            ax.plot([d4z4.XapI, d4z4.XapI], [index_y + 0.01, index_y + 0.03], color='green', lw=2 * direction)
+            ax.text(d4z4.XapI, index_y + 0.03, 'XapI', ha='center', va='bottom', color='green', fontsize=6)
+
+        # 빨간 화살표 그리기 (일반적인 화살표 모양으로 변경)
+        ax.annotate("", xy=(d4z4.pos[1], index_y), xytext=(d4z4.pos[0], index_y),
+                    arrowprops=dict(arrowstyle='->', color='red', lw=2 * direction))
+        # 빨간 화살표 위에 시작점과 끝점 표시
+        ax.text(d4z4.pos[0], index_y + 0.02, f"{d4z4.pos[0]}", ha='left', va='bottom', color='red', fontsize=6)
+        ax.text(d4z4.pos[1], index_y + 0.02, f"{d4z4.pos[1]}", ha='right', va='bottom', color='red', fontsize=6)
+
+        # 빨간 화살표 아래에 인덱스 표시
+        ax.text((d4z4.pos[0] + d4z4.pos[1]) / 2, index_y - 0.01, f"repeat_{i + 1}", ha='center', va='top', color='red', fontsize=8)
+
+    # 그래프 축 설정
+    ax.set_xlim(0, max(matched_reads.pos[1], max(d4z4.pos[1] for d4z4 in matched_reads.d4z4)) + 1000)
+    ax.set_ylim(-0.1, 0.1)
+    ax.axis('off')  # 축 숨기기
+
+    # 그래프 보여주기
+    plt.show()
 
 
 
@@ -346,13 +414,13 @@ if __name__ == "__main__":
 
             extracted_blastresult_with_readID = filter_blastresult_with_seqid(sample_blastresult, readID)
             filtered_blastresult = filter_blastresultlist_with_alignment_cov(extracted_blastresult_with_readID, 0.7)
-            filtered_blastresult = filter_blastresultlist_with_pid(filtered_blastresult, 0.8)
+            filtered_blastresult = filter_blastresultlist_with_pid(filtered_blastresult, 0.7)
             filtered_blastresult = sort_blastresult_list(filtered_blastresult, 'sstart', False)
             write_blastresult_tsv(filtered_blastresult, f"{sample_blastn_path}/{readID}/{readID}.blastn.tsv")
 
             extracted_D4Z4_blastresult_with_readID = filter_blastresult_with_seqid(sample_D4Z4_blastresult, readID)
             filtered_D4Z4_blastresult = filter_blastresultlist_with_alignment_cov(extracted_D4Z4_blastresult_with_readID, 0.7)
-            filtered_D4Z4_blastresult = filter_blastresultlist_with_pid(filtered_D4Z4_blastresult, 0.8)
+            filtered_D4Z4_blastresult = filter_blastresultlist_with_pid(filtered_D4Z4_blastresult, 0.7)
             filtered_D4Z4_blastresult = sort_blastresult_list(filtered_D4Z4_blastresult, 'sstart', False)
             write_blastresult_tsv(filtered_D4Z4_blastresult, f"{sample_blastn_path}/{readID}/{readID}.D4Z4.blastn.tsv")
 
@@ -411,4 +479,4 @@ if __name__ == "__main__":
             os.system(f"rm {D4Z4_blastdb_path}.n*")
             os.system(f"rm {read_blastdb_path}.n*")
 
-    
+    # draw plot

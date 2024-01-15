@@ -275,14 +275,21 @@ def draw_arrows(matched_reads):
         ax.annotate("", xy=(d4z4.pos[1], index_y), xytext=(d4z4.pos[0], index_y),
                     arrowprops=dict(arrowstyle='->', color='red', lw=2 * direction))
         # 빨간 화살표 위에 시작점과 끝점 표시
-        ax.text(d4z4.pos[0], index_y + 0.02, f"{d4z4.pos[0]}", ha='left', va='bottom', color='red', fontsize=6)
-        ax.text(d4z4.pos[1], index_y + 0.02, f"{d4z4.pos[1]}", ha='right', va='bottom', color='red', fontsize=6)
-
+        if direction == -1:
+          ax.text(d4z4.pos[0], index_y + 0.02, f"{d4z4.pos[0]}", ha='right', va='bottom', color='red', fontsize=6)
+          ax.text(d4z4.pos[1], index_y + 0.02, f"{d4z4.pos[1]}", ha='left', va='bottom', color='red', fontsize=6)
+        else:
+          ax.text(d4z4.pos[0], index_y + 0.02, f"{d4z4.pos[0]}", ha='left', va='bottom', color='red', fontsize=6)
+          ax.text(d4z4.pos[1], index_y + 0.02, f"{d4z4.pos[1]}", ha='right', va='bottom', color='red', fontsize=6)
         # 빨간 화살표 아래에 인덱스 표시
         ax.text((d4z4.pos[0] + d4z4.pos[1]) / 2, index_y - 0.01, f"repeat_{i + 1}", ha='center', va='top', color='red', fontsize=8)
 
     # 그래프 축 설정
-    ax.set_xlim(0, max(matched_reads.pos[1], max(d4z4.pos[1] for d4z4 in matched_reads.d4z4)) + 1000)
+    if direction == -1:
+      ax.set_xlim(0, max(matched_reads.pos[0], max(d4z4.pos[0] for d4z4 in matched_reads.d4z4)) + 1000)
+    else:
+      ax.set_xlim(0, max(matched_reads.pos[1], max(d4z4.pos[1] for d4z4 in matched_reads.d4z4)) + 1000)
+
     ax.set_ylim(-0.1, 0.1)
     ax.axis('off')  # 축 숨기기
 

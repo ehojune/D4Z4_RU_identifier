@@ -4,6 +4,7 @@ import argparse
 import sys
 from operator import attrgetter
 import matplotlib.pyplot as plt
+from multiprocessing import Pool
 
 
 class BlastResult:
@@ -57,6 +58,7 @@ def run_makeblastdb(makeblastdb_path, fasta_path, output_db_path):
 	command = makeblastdb_path
 	command += f" -in {fasta_path} -dbtype nucl"
 	command += f" -out {output_db_path}"
+	os.makedirs(output_db_path, exist_ok=True)
 	os.system(command)
 
 def run_blastn(makeblastdb_path, query_path, output_path):
@@ -347,26 +349,32 @@ if __name__ == "__main__":
 	prepare_query_dir(outdir_fasta_path)
 
 
-	#Convert FASTQ to FASTA
-	for sample in samples:
-		# set input & output files path
+
+
+
+	def process(sample):
 		sample_fastq_path = sample_fastq_dict[sample]
 		output_fasta_path = f"{outdir_fasta_path}/{sample}.fa"
-		# run function
 		convert_fq2fa(sample_fastq_path, output_fasta_path)
+
+	with Pool(len(samples)) as p:
+		p.map(process, samples)
+
+
+
+
+
+	def process1(sample):
+		run_makeblastdb(makeblastdb_path, f"{outdir_fasta_path}/{sample}.fa",f"{outdir_blastdb_path}/{sample}")
 
 
 	# make blastdb for FASTA files
 	outdir_blastdb_path = tmpdir_path + '/blastdb'
 	os.makedirs(outdir_fasta_path, exist_ok=True)
+	with Pool(len(samples)) as p:
+		p.map(process1, samples)
 
-	for sample in samples:
-		# set input & output files path
-		sample_fasta_path = f"{outdir_fasta_path}/{sample}.fa"
-		output_sample_blastdb_path = f"{outdir_blastdb_path}/{sample}"
-		os.makedirs(output_sample_blastdb_path, exist_ok=True)
-		# run function
-		run_makeblastdb(makeblastdb_path, sample_fasta_path, output_sample_blastdb_path)
+
 
 
 	# run blastn for pLAM, D4Z4 and probe for samples, find overlapping readID's in blastn results.
@@ -489,3 +497,5 @@ if __name__ == "__main__":
 			read_blastdb_path = read_fasta_path.split(".fasta")[0]
 
 		### Todo ###
+			
+			

@@ -73,6 +73,7 @@ def browse_blastresult(blast_filename):
 	blastresults = []
 	with open(blast_filename, 'r') as fr:
 		for line in fr:
+			if len(line) == 0: break
 			if not line.startswith('#') and not line.startswith('qseqid'):
 				line_splited = line.strip().split('\t')
 				qseqid = line_splited[0]
@@ -111,7 +112,7 @@ def filter_blastresultlist_with_pid(blastresult_list, pident):
 	# pid : 0 to 100
 	filtered_list = []
 	for blastresult in blastresult_list:
-		if blastresult.pident >= pident:
+		if blastresult.pident >= pident*100:
 			filtered_list.append(blastresult)
 	return filtered_list
 
@@ -129,14 +130,9 @@ def check_overlap_seqid_in_blastresults(blast_filename1, blast_filename2):
 
 def write_blastresult_tsv(blastresult_list, save_path):
 	fw = open(save_path, 'w')
-	fw.write("qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\t\
-		sstart\tsend\tevalue\tbitscore\tqlen\tslen\n")
+	fw.write("qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tsstart\tsend\tevalue\tbitscore\tqlen\tslen\n")
 	for blastresult in blastresult_list:
-		fw.write(f"{blastresult.qseqid}\t{blastresult.sseqid}\t\
-			{blastresult.pident}\t{blastresult.length}\t{blastresult.mismatch}\t\
-			{blastresult.gapopen}\t{blastresult.qstart}\t{blastresult.qend}\t\
-			{blastresult.sstart}\t{blastresult.send}\t{blastresult.evalue}\t\
-			{blastresult.bitscore}\t{blastresult.qlen}\t{blastresult.slen}\n")
+		fw.write(f"{blastresult.qseqid}\t{blastresult.sseqid}\t{blastresult.pident}\t{blastresult.length}\t{blastresult.mismatch}\t{blastresult.gapopen}\t{blastresult.qstart}\t{blastresult.qend}\t{blastresult.sstart}\t{blastresult.send}\t{blastresult.evalue}\t{blastresult.bitscore}\t{blastresult.qlen}\t{blastresult.slen}\n")
 	fw.close()
 
 def sort_blastresult_list(blastresult_list :list, sortby: str, reverse: bool) -> list:
@@ -240,7 +236,7 @@ def run_blastn_short(makeblastdb_path, query_path, output_path, word_size=False)
 	command += " -outfmt \"6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen\" "
 	os.system(command)
 
-def draw_arrows(matched_reads):
+def draw_arrows(matched_reads, save_path):
 	# 각 숫자에 적절한 간격을 주기 위한 값
 	gap = 700
 
@@ -303,7 +299,7 @@ def draw_arrows(matched_reads):
 	ax.axis('off')  # 축 숨기기
 
 	# 그래프 보여주기
-	plt.show()
+	plt.savefig(save_path, format = 'png', dpi = 1200)
 
 
 
@@ -357,8 +353,8 @@ if __name__ == "__main__":
 		output_fasta_path = f"{outdir_fasta_path}/{sample}.fa"
 		convert_fq2fa(sample_fastq_path, output_fasta_path)
 
-	with Pool(len(samples)) as p:
-		p.map(process, samples)
+	#with Pool(len(samples)) as p:
+		#p.map(process, samples)
 
 
 
@@ -370,30 +366,30 @@ if __name__ == "__main__":
 
 	# make blastdb for FASTA files
 	outdir_blastdb_path = tmpdir_path + '/blastdb'
-	os.makedirs(outdir_fasta_path, exist_ok=True)
-	with Pool(len(samples)) as p:
-		p.map(process1, samples)
+	#os.makedirs(outdir_fasta_path, exist_ok=True)
+	#with Pool(len(samples)) as p:
+	#	p.map(process1, samples)
 
 
 
 
 	# run blastn for pLAM, D4Z4 and probe for samples, find overlapping readID's in blastn results.
 	outdir_blastn_path = output_path + '/blast'
-	os.makedirs(outdir_blastn_path, exist_ok=True)
+	#os.makedirs(outdir_blastn_path, exist_ok=True)
 	matched_readID_dict = {}
 
 	for sample in samples:
 		# set input & output files path
 		sample_blastdb_path = f"{outdir_blastdb_path}/{sample}"
 		output_sample_blastn_path = f"{outdir_blastn_path}/{sample}"
-		os.makedirs(output_sample_blastn_path, exist_ok=True)
+		#os.makedirs(output_sample_blastn_path, exist_ok=True)
 		output_sample_blastn_pLAM_path = f"{output_sample_blastn_path}/pLAM_{sample}.txt"
 		output_sample_blastn_D4Z4_path = f"{output_sample_blastn_path}/D4Z4_{sample}.txt"
 		output_sample_blastn_probe_path = f"{output_sample_blastn_path}/probe_{sample}.txt"
 		# run function
-		run_blastn(sample_blastdb_path, pLAM_ref, output_sample_blastn_pLAM_path)
-		run_blastn(sample_blastdb_path, D4Z4_ref, output_sample_blastn_D4Z4_path)
-		run_blastn(sample_blastdb_path, probe_ref, output_sample_blastn_probe_path)
+		#run_blastn(sample_blastdb_path, pLAM_ref, output_sample_blastn_pLAM_path)
+		#run_blastn(sample_blastdb_path, D4Z4_ref, output_sample_blastn_D4Z4_path)
+		#run_blastn(sample_blastdb_path, probe_ref, output_sample_blastn_probe_path)
 		# browse and find overlapping readIDs in blastn results
 		pLAM_probe_overlap_seqID_list = check_overlap_seqid_in_blastresults(output_sample_blastn_pLAM_path, output_sample_blastn_probe_path)
 		if not pLAM_probe_overlap_seqID_list:
@@ -423,14 +419,14 @@ if __name__ == "__main__":
 		for readID in sample_readID_list:
 			os.makedirs(f"{sample_blastn_path}/{readID}", exist_ok=True)
 			# make an output of blastn result for pLAM, probe and D4Z4 for each spanning read
-			extracted_blastresult_with_readID = filter_blastresult_with_seqid(sample_blastresult, readID)
-			filtered_blastresult = filter_blastresultlist_with_alignment_cov(extracted_blastresult_with_readID, 0.7)
-			filtered_blastresult = filter_blastresultlist_with_pid(filtered_blastresult, 0.7)
-			sorted_blastresult = sort_blastresult_list(filtered_blastresult, 'sstart', False)
-			write_blastresult_tsv(sorted_blastresult, f"{sample_blastn_path}/{readID}/{readID}.blastn.tsv")
+			#extracted_blastresult_with_readID = filter_blastresult_with_seqid(sample_blastresult, readID)
+			#filtered_blastresult = filter_blastresultlist_with_alignment_cov(extracted_blastresult_with_readID, 0.8)
+			#filtered_blastresult = filter_blastresultlist_with_pid(filtered_blastresult, 0.8)
+			#sorted_blastresult = sort_blastresult_list(filtered_blastresult, 'sstart', False)
+			#write_blastresult_tsv(sorted_blastresult, f"{sample_blastn_path}/{readID}/{readID}.blastn.tsv")
 			# make an output of blastn result for only D4Z4 for each spanning read
-			D4Z4_blastresult = [blastresult for blastresult in sorted_blastresult if blastresult.qseqid == "D38024.1"]
-			write_blastresult_tsv(D4Z4_blastresult, f"{sample_blastn_path}/{readID}/{readID}.D4Z4.blastn.tsv")
+			#D4Z4_blastresult = [blastresult for blastresult in sorted_blastresult if blastresult.qseqid == "D4Z4"]
+			#write_blastresult_tsv(D4Z4_blastresult, f"{sample_blastn_path}/{readID}/{readID}.D4Z4.blastn.tsv")
 
 
 	# extract matched reads from FASTQ
@@ -438,7 +434,7 @@ if __name__ == "__main__":
 
 	matched_reads_fasta_path = {}
 	os.makedirs(f"{output_path}/matched_reads" , exist_ok=True)
-	for sample in samples:
+	for sample in matched_readID_dict.keys():
 		sample_readID_list = matched_readID_dict[sample]
 		os.makedirs(f"{output_path}/matched_reads/{sample}", exist_ok=True)
 		for readID in sample_readID_list:
@@ -446,7 +442,7 @@ if __name__ == "__main__":
 			os.makedirs(output_read_fasta_dir, exist_ok=True)
 			output_read_fasta_path = f"{output_read_fasta_dir}/{readID}.fasta"
 			sample_fasta_path = f"{outdir_fasta_path}/{sample}.fa"
-			extract_read_from_fasta_with_readID(readID, sample_fasta_path, output_read_fasta_path)
+		#		#	extract_read_from_fasta_with_readID(readID, sample_fasta_path, output_read_fasta_path)
 			matched_reads_fasta_path[readID] = output_read_fasta_path
 	print("extract D4Z4 from each matched reads FASTQ")
 
@@ -457,9 +453,9 @@ if __name__ == "__main__":
 			read_fasta_path = matched_reads_fasta_path[readID]
 			readID_result_path = f"{outdir_blastn_path}/{sample}/{readID}"
 			read_D4Z4_blast_path = readID_result_path + f"/{readID}.D4Z4.blastn.tsv"
-			output_D4Z4_seperated_fasta_path = readID_result_path +f"/{readID}.D4Z4.fasta"
-			extract_tr_from_read(readID, read_fasta_path, read_D4Z4_blast_path, output_D4Z4_seperated_fasta_path)
-			add_reference_to_tr_extracted_fasta(D4Z4_ref, output_D4Z4_seperated_fasta_path)
+			#output_D4Z4_seperated_fasta_path = readID_result_path +f"/{readID}.D4Z4.fasta"
+			#extract_tr_from_read(readID, read_fasta_path, read_D4Z4_blast_path, output_D4Z4_seperated_fasta_path)
+			#add_reference_to_tr_extracted_fasta(D4Z4_ref, output_D4Z4_seperated_fasta_path)
 
 	# make blastdb for each d4z4 of each read of each sample
 	# run blastn-short for enzyme, plam
@@ -472,13 +468,13 @@ if __name__ == "__main__":
 			D4Z4_blastdb_path = output_D4Z4_seperated_fasta_path.split(".D4Z4")[0]
 			read_blastdb_path = read_fasta_path.split(".fasta")[0]
 
-			run_makeblastdb(makeblastdb_path, output_D4Z4_seperated_fasta_path, D4Z4_blastdb_path)
-			run_makeblastdb(makeblastdb_path, read_fasta_path, read_blastdb_path)
+			#run_makeblastdb(makeblastdb_path, output_D4Z4_seperated_fasta_path, D4Z4_blastdb_path)
+			#run_makeblastdb(makeblastdb_path, read_fasta_path, read_blastdb_path)
 
-			run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/BlnI_seq.fasta",f"{readID_result_path}/BlnI_seq.blast.tsv", 6)
-			run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/XapI_seq.fasta", f"{readID_result_path}/XapI_seq.blast.tsv", 6)
-			run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_4qA_seq.fasta", f"{readID_result_path}/pLAM_4qA_seq.blast.tsv")
-			run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_10q_seq.fasta", f"{readID_result_path}/pLAM_10q_seq.blast.tsv")
+			#run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/BlnI_seq.fasta",f"{readID_result_path}/BlnI_seq.blast.tsv", 6)
+			#run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/XapI_seq.fasta", f"{readID_result_path}/XapI_seq.blast.tsv", 6)
+			#run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_4qA_seq.fasta", f"{readID_result_path}/pLAM_4qA_seq.blast.tsv")
+			#run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_10q_seq.fasta", f"{readID_result_path}/pLAM_10q_seq.blast.tsv")
 			
 			os.system(f"rm {D4Z4_blastdb_path}.n*")
 			os.system(f"rm {read_blastdb_path}.n*")
@@ -490,12 +486,60 @@ if __name__ == "__main__":
 	for sample in matched_readID_dict.keys():
 		sample_readID_list = matched_readID_dict[sample]
 		for readID in sample_readID_list:
-			read_fasta_path = matched_reads_fasta_path[readID]
 			readID_result_path = f"{outdir_blastn_path}/{sample}/{readID}"
-			output_D4Z4_seperated_fasta_path = readID_result_path +f"/{readID}.D4Z4.fasta"
-			D4Z4_blastdb_path = output_D4Z4_seperated_fasta_path.split(".D4Z4")[0]
-			read_blastdb_path = read_fasta_path.split(".fasta")[0]
+			read_blastresults = browse_blastresult(f"{readID_result_path}/{readID}.blastn.tsv")
+			read_BlnI_blastresults = browse_blastresult(f"{readID_result_path}/BlnI_seq.blast.tsv.outfmt6.tsv")
+			read_XapI_blastresults = browse_blastresult(f"{readID_result_path}/XapI_seq.blast.tsv.outfmt6.tsv")
+			
+			read_d4z4_list = []
+			for blastresult in read_blastresults:
+				read_direction = 1 if blastresult.sstart < blastresult.send else -1
+				read_length = blastresult.slen
+				read_id = blastresult.sseqid
+				if blastresult.qseqid == "pLAM":
+					pLAM_pos = (blastresult.sstart, blastresult.send)
+					continue
+				if blastresult.qseqid == "GU550601.1":
+					probe_pos = (blastresult.sstart, blastresult.send)
+					continue
+				else:
+					d4z4_pos = D4Z4((blastresult.sstart, blastresult.send), 'NA', 'NA')
+					read_d4z4_list.append(d4z4_pos)
+			if read_direction == -1:
+				read_d4z4_list = read_d4z4_list[::-1]
 
-		### Todo ###
+			if len(read_BlnI_blastresults):
+				for blnI_blastresult in read_BlnI_blastresults:
+					direction = 1 if blnI_blastresult.sstart < blnI_blastresult.send else -1
+					repeat_num = int(blnI_blastresult.sseqid.split('repeat')[-1])
+					if direction == 1 and  2750 <= blnI_blastresult.sstart and blnI_blastresult.sstart < 2850:
+						if read_direction == 1:
+							read_d4z4_list[repeat_num-1].BlnI = read_d4z4_list[repeat_num-1].pos[0] + blnI_blastresult.sstart-1
+							continue
+						elif read_direction == -1:	
+							read_d4z4_list[repeat_num-1].BlnI = read_d4z4_list[repeat_num-1].pos[1] + blnI_blastresult.sstart-1
+
+			if len(read_XapI_blastresults):
+				for xapI_blastresult in read_XapI_blastresults:
+					direction = 1 if xapI_blastresult.sstart < xapI_blastresult.send else -1
+					repeat_num = int(xapI_blastresult.sseqid.split('repeat')[-1])
+					if direction == 1 and 1280 <= xapI_blastresult.sstart and xapI_blastresult.sstart <= 1380:
+						if read_direction == 1:
+							read_d4z4_list[repeat_num-1].XapI = read_d4z4_list[repeat_num-1].pos[0] + xapI_blastresult.sstart-1
+							continue
+						elif read_direction == -1:
+							read_d4z4_list[repeat_num-1].XapI = read_d4z4_list[repeat_num-1].pos[1] + xapI_blastresult.sstart-1
+
+			read_pos = (1, read_length) if read_direction == 1 else (read_length, 1)
+			print(read_d4z4_list, pLAM_pos, probe_pos)
+			draw_arrows(MatchedReads(read_pos, read_d4z4_list, pLAM_pos, probe_pos, "NA", read_id), f"{readID_result_path}/{readID}.png")
+
+
+
+
+
+
+
+		
 			
-			
+	

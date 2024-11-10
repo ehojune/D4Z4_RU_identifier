@@ -6,6 +6,7 @@ from operator import attrgetter
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 
+### Classes ###
 
 class BlastResult:
 	def __init__(self,qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore, qlen, slen):
@@ -39,9 +40,8 @@ class MatchedReads:
 		self.pLAM_seq = pLAM_seq
 		self.read_id = read_id
 
-### funcs ###
+### Functions ###
 
-# gunzip function is not used; but let users make sure their input fastq to be unzipped in the manual.
 def run_gunzip(gzipped_file_path, output_path):
 	command = f"gunzip -c {gzipped_file_path} >{output_path}"
 	os.system(command)
@@ -237,37 +237,23 @@ def run_blastn_short(makeblastdb_path, query_path, output_path, word_size=False)
 	os.system(command)
 
 def draw_arrows(matched_reads, save_path):
-	# 각 숫자에 적절한 간격을 주기 위한 값
+
 	gap = 700
-
-	# 그림 그리기
 	fig, ax = plt.subplots(figsize=(10, 2))
-
-	# 방향 설정
 	direction = 1 if matched_reads.pos[0] < matched_reads.pos[1] else -1
-
-	# 검은 화살표 그리기 (일반적인 화살표 모양으로 변경)
 	ax.annotate("", xy=(matched_reads.pos[1], 0), xytext=(matched_reads.pos[0], 0),
 				arrowprops=dict(arrowstyle='->', color='black', lw=2))
 	ax.text((matched_reads.pos[0] + matched_reads.pos[1]) / 2, -0.03, matched_reads.read_id, ha='center', va='bottom', color='black', fontsize=8)
-	# 검은 화살표 위에 숫자 표시
 	ax.text(matched_reads.pos[0], 0.01, str(matched_reads.pos[0]), ha='center', va='bottom', color='black', fontsize=6)
 	ax.text(matched_reads.pos[1], 0.01, str(matched_reads.pos[1]), ha='center', va='bottom', color='black', fontsize=6)
-
-	# 빨간 화살표 그리기 (pLAM)
 	index_y = 0.03
 	ax.annotate("", xy=(matched_reads.pLAM[1], index_y), xytext=(matched_reads.pLAM[0], index_y),
 				arrowprops=dict(arrowstyle='->', color='red', lw=2 * direction))
 	ax.text((matched_reads.pLAM[0] + matched_reads.pLAM[1]) / 2, index_y -0.01, 'pLAM', ha='center', va='top', color='red', fontsize=8)
-
-	# 빨간 화살표 그리기 (probe)
 	ax.annotate("", xy=(matched_reads.probe[1], index_y), xytext=(matched_reads.probe[0], index_y),
 				arrowprops=dict(arrowstyle='->', color='red', lw=2 * direction))
 	ax.text((matched_reads.probe[0] + matched_reads.probe[1]) / 2, index_y -0.01, 'probe', ha='center', va='top', color='red', fontsize=8)
-
-	# 빨간 화살표 그리기 (d4z4)
 	for i, d4z4 in enumerate(matched_reads.d4z4):
-		# 특정 위치에 위치된 선 그리기
 		if d4z4.BlnI != 'NA':
 			ax.plot([d4z4.BlnI, d4z4.BlnI], [index_y + 0.01, index_y + 0.03], color='blue', lw=2 * direction)
 			ax.text(d4z4.BlnI, index_y + 0.03, 'BlnI', ha='center', va='bottom', color='blue', fontsize=6)
@@ -276,35 +262,23 @@ def draw_arrows(matched_reads, save_path):
 			ax.plot([d4z4.XapI, d4z4.XapI], [index_y + 0.01, index_y + 0.03], color='green', lw=2 * direction)
 			ax.text(d4z4.XapI, index_y + 0.03, 'XapI', ha='center', va='bottom', color='green', fontsize=6)
 
-		# 빨간 화살표 그리기 (일반적인 화살표 모양으로 변경)
 		ax.annotate("", xy=(d4z4.pos[1], index_y), xytext=(d4z4.pos[0], index_y),
 					arrowprops=dict(arrowstyle='->', color='red', lw=2 * direction))
-		# 빨간 화살표 위에 시작점과 끝점 표시
 		if direction == -1:
 			ax.text(d4z4.pos[0], index_y + 0.02, f"{d4z4.pos[0]}", ha='right', va='bottom', color='red', fontsize=6)
 			ax.text(d4z4.pos[1], index_y + 0.02, f"{d4z4.pos[1]}", ha='left', va='bottom', color='red', fontsize=6)
 		else:
 			ax.text(d4z4.pos[0], index_y + 0.02, f"{d4z4.pos[0]}", ha='left', va='bottom', color='red', fontsize=6)
 			ax.text(d4z4.pos[1], index_y + 0.02, f"{d4z4.pos[1]}", ha='right', va='bottom', color='red', fontsize=6)
-		# 빨간 화살표 아래에 인덱스 표시
 		ax.text((d4z4.pos[0] + d4z4.pos[1]) / 2, index_y - 0.01, f"repeat_{i + 1}", ha='center', va='top', color='red', fontsize=8)
-
-	# 그래프 축 설정
 	if direction == -1:
 		ax.set_xlim(0, max(matched_reads.pos[0], max(d4z4.pos[0] for d4z4 in matched_reads.d4z4)) + 1000)
 	else:
 		ax.set_xlim(0, max(matched_reads.pos[1], max(d4z4.pos[1] for d4z4 in matched_reads.d4z4)) + 1000)
-
+		
 	ax.set_ylim(-0.1, 0.1)
-	ax.axis('off')  # 축 숨기기
-
-	# 그래프 보여주기
+	ax.axis('off')
 	plt.savefig(save_path, format = 'png', dpi = 1200)
-
-
-
-def run_porechop():
-	pass
 
 
 if __name__ == "__main__":
@@ -317,11 +291,9 @@ if __name__ == "__main__":
 	output_path = args.output
 	config_path = args.config
 
-
 	#make output & temp output directory
 	tmpdir_path = output_path + '/tmp'
 	os.makedirs(tmpdir_path, exist_ok=True)
-
 
 	#Read config
 	config = configparser.ConfigParser()
@@ -339,45 +311,18 @@ if __name__ == "__main__":
 	makeblastdb_path = config['External Programs']['makeblastdb_path']
 	porechop_path = config['External Programs']['porechop_path']
 
-
 	# Make BlnI, XapI and pLAM specific sequences to fasta files
 	outdir_fasta_path = output_path + '/fasta'
 	prepare_query_dir(outdir_fasta_path)
 
-
-
-
-
-	def process(sample):
-		sample_fastq_path = sample_fastq_dict[sample]
-		output_fasta_path = f"{outdir_fasta_path}/{sample}.fa"
-		convert_fq2fa(sample_fastq_path, output_fasta_path)
-
-	#with Pool(len(samples)) as p:
-		#p.map(process, samples)
-
-
-
-
-
-	def process1(sample):
-		run_makeblastdb(makeblastdb_path, f"{outdir_fasta_path}/{sample}.fa",f"{outdir_blastdb_path}/{sample}")
-
-
 	# make blastdb for FASTA files
 	outdir_blastdb_path = tmpdir_path + '/blastdb'
-	#os.makedirs(outdir_fasta_path, exist_ok=True)
-	#with Pool(len(samples)) as p:
-	#	p.map(process1, samples)
-
-
-
+	os.makedirs(outdir_fasta_path, exist_ok=True)
 
 	# run blastn for pLAM, D4Z4 and probe for samples, find overlapping readID's in blastn results.
 	outdir_blastn_path = output_path + '/blast'
-	#os.makedirs(outdir_blastn_path, exist_ok=True)
+	os.makedirs(outdir_blastn_path, exist_ok=True)
 	matched_readID_dict = {}
-
 	for sample in samples:
 		# set input & output files path
 		sample_blastdb_path = f"{outdir_blastdb_path}/{sample}"
@@ -405,7 +350,6 @@ if __name__ == "__main__":
 
 	# collect, filter, sort and write blast results of matched seqID
 	# make an output of blast result of a matched read that contains pLAM, D4Z4 and probe.
-
 	for sample in matched_readID_dict.keys():
 		# get matched readID for sample
 		sample_readID_list = matched_readID_dict[sample]
@@ -431,7 +375,6 @@ if __name__ == "__main__":
 
 	# extract matched reads from FASTQ
 	print("start extracting matched reads from FASTQ")
-
 	matched_reads_fasta_path = {}
 	os.makedirs(f"{output_path}/matched_reads" , exist_ok=True)
 	for sample in matched_readID_dict.keys():
@@ -442,7 +385,7 @@ if __name__ == "__main__":
 			os.makedirs(output_read_fasta_dir, exist_ok=True)
 			output_read_fasta_path = f"{output_read_fasta_dir}/{readID}.fasta"
 			sample_fasta_path = f"{outdir_fasta_path}/{sample}.fa"
-		#		#	extract_read_from_fasta_with_readID(readID, sample_fasta_path, output_read_fasta_path)
+			extract_read_from_fasta_with_readID(readID, sample_fasta_path, output_read_fasta_path)
 			matched_reads_fasta_path[readID] = output_read_fasta_path
 	print("extract D4Z4 from each matched reads FASTQ")
 
@@ -468,21 +411,20 @@ if __name__ == "__main__":
 			D4Z4_blastdb_path = output_D4Z4_seperated_fasta_path.split(".D4Z4")[0]
 			read_blastdb_path = read_fasta_path.split(".fasta")[0]
 
-			#run_makeblastdb(makeblastdb_path, output_D4Z4_seperated_fasta_path, D4Z4_blastdb_path)
-			#run_makeblastdb(makeblastdb_path, read_fasta_path, read_blastdb_path)
+			run_makeblastdb(makeblastdb_path, output_D4Z4_seperated_fasta_path, D4Z4_blastdb_path)
+			run_makeblastdb(makeblastdb_path, read_fasta_path, read_blastdb_path)
 
-			#run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/BlnI_seq.fasta",f"{readID_result_path}/BlnI_seq.blast.tsv", 6)
-			#run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/XapI_seq.fasta", f"{readID_result_path}/XapI_seq.blast.tsv", 6)
-			#run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_4qA_seq.fasta", f"{readID_result_path}/pLAM_4qA_seq.blast.tsv")
-			#run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_10q_seq.fasta", f"{readID_result_path}/pLAM_10q_seq.blast.tsv")
+			run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/BlnI_seq.fasta",f"{readID_result_path}/BlnI_seq.blast.tsv", 6)
+			run_blastn_short(D4Z4_blastdb_path, f"{outdir_fasta_path}/XapI_seq.fasta", f"{readID_result_path}/XapI_seq.blast.tsv", 6)
+			run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_4qA_seq.fasta", f"{readID_result_path}/pLAM_4qA_seq.blast.tsv")
+			run_blastn_short(read_blastdb_path, f"{outdir_fasta_path}/pLAM_10q_seq.fasta", f"{readID_result_path}/pLAM_10q_seq.blast.tsv")
 			
 			os.system(f"rm {D4Z4_blastdb_path}.n*")
 			os.system(f"rm {read_blastdb_path}.n*")
 
 
 
-	# draw plot
-			
+	# draw plots	
 	for sample in matched_readID_dict.keys():
 		sample_readID_list = matched_readID_dict[sample]
 		for readID in sample_readID_list:
@@ -533,13 +475,3 @@ if __name__ == "__main__":
 			read_pos = (1, read_length) if read_direction == 1 else (read_length, 1)
 			print(read_d4z4_list, pLAM_pos, probe_pos)
 			draw_arrows(MatchedReads(read_pos, read_d4z4_list, pLAM_pos, probe_pos, "NA", read_id), f"{readID_result_path}/{readID}.png")
-
-
-
-
-
-
-
-		
-			
-	
